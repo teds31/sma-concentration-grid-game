@@ -2,10 +2,11 @@
 	import { page } from '$app/stores';
 	import { gameStore } from '../stores/gameStore.js';
 	import { settingsStore } from '../stores/settingsStore.js';
-	import { Home, Trophy, Settings, Info, Brain, Menu, X } from 'lucide-svelte';
+	import { authStore } from '../stores/authStore.js';
+	import { Home, Trophy, Settings, Info, Brain, Menu, X, User, LogIn } from 'lucide-svelte';
 	import { onMount } from 'svelte';
-	import stonewallLogo from '/stonewall-logo-black.png';
-	import stonewallIcon from '$lib/assets/stonewall-icon.png';
+	const smaLogo = '/assets/images/sma-logo.png';
+	const smaIcon = '/assets/images/sma-icon.png';
 
 	let mobileMenuOpen = false;
 	let mounted = false;
@@ -16,6 +17,7 @@
 
 	$: currentPath = $page.url.pathname;
 	$: stats = $gameStore.stats;
+	$: user = $authStore.user;
 	$: isDarkMode = mounted ? $settingsStore.theme === 'dark' || ($settingsStore.theme === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches) : false;
 
 	function toggleMobileMenu() {
@@ -40,7 +42,7 @@
 		<!-- Logo/Brand -->
 		<div class="nav-brand">
 			<a href="/" class="brand-link" on:click={closeMobileMenu}>
-				<img src={stonewallLogo} alt="Stonewall Mind Academy" class="brand-logo" />
+				<img src={smaLogo} alt="Stonewall Mind Academy" class="brand-logo" />
 				<!-- <span class="brand-text">Concentration Grid Game</span> -->
 			</a>
 		</div>
@@ -56,6 +58,18 @@
 				<Home size={20} />
 				<span>Game</span>
 			</a>
+
+			{#if user}
+				<a
+					href="/dashboard"
+					class="nav-link"
+					class:active={isActivePath('/dashboard')}
+					title="Dashboard"
+				>
+					<User size={20} />
+					<span>Dashboard</span>
+				</a>
+			{/if}
 
 			<a
 				href="/leaderboard"
@@ -88,12 +102,25 @@
 			</a>
 		</div>
 
-		<!-- User Stats (Desktop) -->
+		<!-- User Stats & Auth (Desktop) -->
 		<div class="nav-stats desktop-nav">
-			<div class="stat-item">
-				<Trophy size={16} />
-				<span>{getTotalGamesCompleted()}</span>
-			</div>
+			{#if user}
+				<div class="stat-item">
+					<Trophy size={16} />
+					<span>{getTotalGamesCompleted()}</span>
+				</div>
+				<div class="auth-controls">
+					<span class="user-name">Hi, {user.user_metadata?.full_name || user.email}</span>
+					<button class="sign-out-btn" on:click={() => authStore.signOut()}>
+						Sign Out
+					</button>
+				</div>
+			{:else}
+				<div class="stat-item">
+					<Trophy size={16} />
+					<span>{getTotalGamesCompleted()}</span>
+				</div>
+			{/if}
 		</div>
 
 		<!-- Mobile Menu Toggle -->
@@ -123,6 +150,18 @@
 					<Home size={20} />
 					<span>Game</span>
 				</a>
+
+				{#if user}
+					<a
+						href="/dashboard"
+						class="mobile-nav-link"
+						class:active={isActivePath('/dashboard')}
+						on:click={closeMobileMenu}
+					>
+						<User size={20} />
+						<span>Dashboard</span>
+					</a>
+				{/if}
 
 				<a
 					href="/leaderboard"
@@ -159,6 +198,14 @@
 						<Trophy size={16} />
 						<span>Games Won: {getTotalGamesCompleted()}</span>
 					</div>
+					{#if user}
+						<div class="mobile-auth-controls">
+							<span class="user-name">Hi, {user.user_metadata?.full_name || user.email}</span>
+							<button class="sign-out-btn" on:click={() => authStore.signOut()}>
+								Sign Out
+							</button>
+						</div>
+					{/if}
 				</div>
 			</div>
 		</div>
@@ -309,6 +356,73 @@
 
 	.stat-item :global(svg) {
 		color: var(--color-theme-1, #8b5cf6);
+	}
+
+	.auth-controls {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		padding-left: 1rem;
+		border-left: 1px solid #e5e7eb;
+	}
+
+	:global([data-theme="dark"]) .auth-controls {
+		border-left-color: #374151;
+	}
+
+	.user-name {
+		font-size: 0.85rem;
+		color: #6b7280;
+		font-weight: 500;
+		max-width: 150px;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	:global([data-theme="dark"]) .user-name {
+		color: #d1d5db;
+	}
+
+	.sign-out-btn {
+		background: none;
+		border: 1px solid #d1d5db;
+		color: #6b7280;
+		padding: 0.25rem 0.75rem;
+		border-radius: 0.375rem;
+		font-size: 0.8rem;
+		cursor: pointer;
+		transition: all 0.2s ease;
+	}
+
+	.sign-out-btn:hover {
+		background: #f3f4f6;
+		border-color: var(--color-theme-1, #8b5cf6);
+		color: var(--color-theme-1, #8b5cf6);
+	}
+
+	:global([data-theme="dark"]) .sign-out-btn {
+		border-color: #4b5563;
+		color: #d1d5db;
+	}
+
+	:global([data-theme="dark"]) .sign-out-btn:hover {
+		background: #374151;
+		border-color: var(--color-theme-1, #8b5cf6);
+		color: var(--color-theme-1, #8b5cf6);
+	}
+
+	.mobile-auth-controls {
+		margin-top: 0.75rem;
+		padding-top: 0.75rem;
+		border-top: 1px solid #e5e7eb;
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+	}
+
+	:global([data-theme="dark"]) .mobile-auth-controls {
+		border-top-color: #374151;
 	}
 
 	.mobile-menu-toggle {

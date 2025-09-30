@@ -1,26 +1,41 @@
 <script lang="ts">
 	import ConcentrationGame from '$lib/components/ConcentrationGame.svelte';
 	import GameStats from '$lib/components/GameStats.svelte';
+	import AuthModal from '$lib/components/AuthModal.svelte';
 	import { gameStore } from '$lib/stores/gameStore.js';
 	import { settingsStore } from '$lib/stores/settingsStore.js';
-	import { Play, Trophy, Settings, Brain } from 'lucide-svelte';
+	import { authStore } from '$lib/stores/authStore.js';
+	import { Play, Trophy, Settings, Brain, Lock, User, LogOut } from 'lucide-svelte';
 	import { onMount } from 'svelte';
-	import stonewallLogo from '$lib/assets/stonewall-logo.png';
-	import stonewallIcon from '$lib/assets/stonewall-icon.png';
+	const smaLogo = '/assets/images/sma-logo.png';
+	const smaIcon = '/assets/images/sma-icon.png';
 
 	let selectedDifficulty: 'easy' | 'medium' | 'hard' = 'easy';
 	let showGame = false;
 	let mounted = false;
+	let showAuthModal = false;
+	let authMode = 'signin';
 
-	onMount(() => {
+	onMount(async () => {
 		mounted = true;
+		// Initialize auth store
+		await authStore.initialize();
 		// Set default difficulty from settings
 		selectedDifficulty = $settingsStore.defaultDifficulty;
 	});
 
 	$: stats = $gameStore.stats;
+	$: user = $authStore.user;
+	$: authLoading = $authStore.loading;
 
 	function startGame(difficulty: 'easy' | 'medium' | 'hard') {
+		// Require authentication for medium and hard difficulties
+		if ((difficulty === 'medium' || difficulty === 'hard') && !user) {
+			showAuthModal = true;
+			authMode = 'signin';
+			return;
+		}
+		
 		selectedDifficulty = difficulty;
 		showGame = true;
 		gameStore.startGame(difficulty);
@@ -28,6 +43,23 @@
 
 	function backToMenu() {
 		showGame = false;
+	}
+
+	function handleAuthModalClose() {
+		showAuthModal = false;
+	}
+
+	async function handleSignOut() {
+		try {
+			await authStore.signOut();
+		} catch (error) {
+			console.error('Sign out error:', error);
+		}
+	}
+
+	function openAuthModal(mode = 'signin') {
+		authMode = mode;
+		showAuthModal = true;
 	}
 
 	function getTotalGamesPlayed(): number {
@@ -77,7 +109,7 @@
 		<section class="hero">
 			<div class="hero-content">
 				<div class="hero-logo">
-					<img src={stonewallLogo} alt="Stonewall Mind Academy" class="main-logo" />
+					<img src={smaLogo} alt="Stonewall Mind Academy" class="main-logo" />
 				</div>
 				<h1 class="hero-title">Concentration Grid</h1>
 				<p class="hero-subtitle">
@@ -104,12 +136,20 @@
 			<h2>Choose Your Challenge</h2>
 			<div class="difficulty-grid">
 				{#each Object.entries(difficultyInfo) as [difficulty, info]}
-					<div class="difficulty-card" style="--accent-color: {info.color}">
+					<div class="difficulty-card" style="--accent-color: {info.color}" class:locked={!user && (difficulty === 'medium' || difficulty === 'hard')}>
 						<div class="difficulty-header">
 							<span class="difficulty-icon">{info.icon}</span>
 							<h3>{info.title}</h3>
+							{#if !user && (difficulty === 'medium' || difficulty === 'hard')}
+								<Lock size={20} class="lock-icon" />
+							{/if}
 						</div>
-						<p class="difficulty-description">{info.description}</p>
+						<p class="difficulty-description">
+							{info.description}
+							{#if !user && (difficulty === 'medium' || difficulty === 'hard')}
+								<br><strong>Sign in required</strong>
+							{/if}
+						</p>
 
 						{#if mounted}
 							<div class="difficulty-stats">
@@ -134,9 +174,15 @@
 							class="play-button"
 							on:click={() => startGame(difficulty)}
 							style="background-color: {info.color}"
+							class:locked-button={!user && (difficulty === 'medium' || difficulty === 'hard')}
 						>
-							<Play size={20} />
-							Play {info.title}
+							{#if !user && (difficulty === 'medium' || difficulty === 'hard')}
+								<Lock size={20} />
+								Sign In to Play
+							{:else}
+								<Play size={20} />
+								Play {info.title}
+							{/if}
 						</button>
 					</div>
 				{/each}
@@ -206,6 +252,27 @@
 		<ConcentrationGame difficulty={selectedDifficulty} />
 	</div>
 {/if}
+
+<!-- User Info (when signed in) -->
+{#if user && !showGame}
+	<div class="user-info">
+		<div class="user-welcome">
+			<User size={20} />
+			<span>Welcome back, {user.user_metadata?.full_name || user.email?.split('@')[0] || 'Player'}!</span>
+			<button class="sign-out-btn" on:click={handleSignOut}>
+				<LogOut size={16} />
+				Sign Out
+			</button>
+		</div>
+	</div>
+{/if}
+
+<!-- Auth Modal -->
+<AuthModal 
+	bind:isOpen={showAuthModal} 
+	bind:mode={authMode} 
+	on:close={handleAuthModalClose} 
+/>
 
 <style>
 	.home-page {
@@ -570,6 +637,88 @@
 		transform: translateY(-2px);
 	}
 
+	/* Auth and User Styles */
+	.user-info {
+		position: fixed;
+		top: 80px;
+		right: 1rem;
+		z-index: 50;
+	}
+
+	.user-welcome {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		background: rgba(255, 255, 255, 0.95);
+		backdrop-filter: blur(10px);
+		padding: 0.75rem 1rem;
+		border-radius: 0.75rem;
+		border: 1px solid rgba(0, 0, 0, 0.1);
+		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+		font-size: 0.9rem;
+		color: black;
+		font-weight: 500;
+	}
+
+	.sign-out-btn {
+		display: flex;
+		align-items: center;
+		gap: 0.25rem;
+		background: rgba(239, 68, 68, 0.1);
+		color: #dc2626;
+		border: 1px solid rgba(239, 68, 68, 0.3);
+		padding: 0.5rem 0.75rem;
+		border-radius: 0.5rem;
+		cursor: pointer;
+		font-size: 0.8rem;
+		font-weight: 500;
+		transition: all 0.2s ease;
+	}
+
+	.sign-out-btn:hover {
+		background: rgba(239, 68, 68, 0.2);
+		transform: translateY(-1px);
+	}
+
+	.locked {
+		opacity: 0.7;
+		position: relative;
+	}
+
+	.locked::before {
+		content: '';
+		position: absolute;
+		top: 0;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		background: rgba(255, 255, 255, 0.1);
+		border-radius: 1rem;
+		backdrop-filter: blur(2px);
+	}
+
+	.lock-icon {
+		color: rgba(0, 0, 0, 0.6);
+		margin-left: auto;
+	}
+
+	.locked-button {
+		background: rgba(0, 0, 0, 0.6) !important;
+		cursor: pointer;
+	}
+
+	.locked-button:hover {
+		background: rgba(0, 0, 0, 0.8) !important;
+	}
+
+	.difficulty-header {
+		display: flex;
+		align-items: center;
+		gap: 1rem;
+		margin-bottom: 1rem;
+		position: relative;
+	}
+
 	/* Mobile Responsiveness */
 	@media (max-width: 768px) {
 		.hero-title {
@@ -599,7 +748,10 @@
 
 	@media (max-width: 480px) {
 		.hero-title {
-			font-size: 2rem;
+			font-size: 1.5rem;
+			text-align: center;
+			margin-left: auto;
+			margin-right: auto;
 		}
 
 		.stats-actions {

@@ -3,6 +3,8 @@
 	import { writable, get } from 'svelte/store';
 	import { gameStore } from '../stores/gameStore.js';
 	import { settingsStore } from '../stores/settingsStore.js';
+	import { authStore } from '../stores/authStore.js';
+	import { GameDataService } from '../services/gameDataService.js';
 	import { Play, Pause, RotateCcw, Eye, EyeOff } from 'lucide-svelte';
 
 	export let difficulty: 'easy' | 'medium' | 'hard' = 'easy';
@@ -184,7 +186,7 @@
 		}
 	}
 
-	function endGame(success: boolean) {
+	async function endGame(success: boolean) {
 		clearInterval(timerInterval);
 		gameState.set('complete');
 		
@@ -192,20 +194,56 @@
 			const completionTime = Date.now() - startTime;
 			const score = calculateScore(completionTime, hintsUsed);
 			
-			// Update game store with results
-			gameStore.completeGame({
+			const gameResult = {
 				difficulty,
 				time: completionTime,
 				hintsUsed,
 				score,
 				success: true
-			});
+			};
+			
+			// Update game store with results
+			gameStore.completeGame(gameResult);
+			
+			// Save to Supabase if user is authenticated
+			const user = get(authStore).user;
+			if (user) {
+				try {
+					const gameDataService = new GameDataService();
+					await gameDataService.saveGameResult({
+						difficulty,
+						score,
+						time_seconds: Math.round(completionTime / 1000),
+						hints_used: hintsUsed,
+						completed: true
+					});
+				} catch (error) {
+					console.error('Failed to save game result:', error);
+				}
+			}
 			
 			// Play completion sound
 			if (get(settingsStore).soundEnabled) {
 				playSound('complete');
 			}
 		} else {
+			// Save failed attempt if user is authenticated
+			const user = get(authStore).user;
+			if (user) {
+				try {
+					const gameDataService = new GameDataService();
+					await gameDataService.saveGameResult({
+						difficulty,
+						score: 0,
+						time_seconds: Math.round((Date.now() - startTime) / 1000),
+						hints_used: hintsUsed,
+						completed: false
+					});
+				} catch (error) {
+					console.error('Failed to save game result:', error);
+				}
+			}
+			
 			// Play failure sound
 			if (get(settingsStore).soundEnabled) {
 				playSound('failure');
@@ -562,9 +600,12 @@
 	}
 
 	.game-cell.target-cell {
-		background: #fef3c7;
-		border-color: #f59e0b;
+		background: #fbbf24 !important;
+		border-color: #d97706 !important;
+		border-width: 3px !important;
 		animation: pulse 1s infinite;
+		box-shadow: 0 0 0 2px #f59e0b, 0 0 0 4px rgba(245, 158, 11, 0.3);
+		transform: scale(1.05);
 	}
 
 	.game-cell.selected-cell {
@@ -639,8 +680,16 @@
 	}
 
 	@keyframes pulse {
-		0%, 100% { opacity: 1; }
-		50% { opacity: 0.7; }
+		0%, 100% { 
+			opacity: 1; 
+			transform: scale(1.05);
+			box-shadow: 0 0 0 2px #f59e0b, 0 0 0 4px rgba(245, 158, 11, 0.3);
+		}
+		50% { 
+			opacity: 0.8; 
+			transform: scale(1.1);
+			box-shadow: 0 0 0 3px #f59e0b, 0 0 0 6px rgba(245, 158, 11, 0.5);
+		}
 	}
 
 	@keyframes shake {
@@ -685,6 +734,26 @@
 		.game-cell {
 			min-height: 50px;
 			font-size: 1rem;
+		}
+
+		.game-cell.target-cell {
+			background: #f59e0b !important;
+			border-color: #d97706 !important;
+			border-width: 4px !important;
+			transform: scale(1.1) !important;
+			box-shadow: 0 0 0 3px #f59e0b, 0 0 0 6px rgba(245, 158, 11, 0.6) !important;
+			animation: mobile-pulse 0.8s infinite;
+		}
+
+		@keyframes mobile-pulse {
+			0%, 100% { 
+				opacity: 1; 
+				transform: scale(1.1);
+			}
+			50% { 
+				opacity: 0.7; 
+				transform: scale(1.15);
+			}
 		}
 	}
 </style>
