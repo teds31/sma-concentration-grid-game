@@ -1,7 +1,21 @@
 import { createClient } from '@supabase/supabase-js'
-import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$env/static/public'
+import { env } from '$env/dynamic/public'
+import { browser } from '$app/environment'
 
-// Create Supabase client only if environment variables are available
-export const supabase = PUBLIC_SUPABASE_URL && PUBLIC_SUPABASE_ANON_KEY 
-	? createClient(PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY)
-	: null
+// Get environment variables dynamically to avoid build-time errors
+const getSupabaseUrl = () => env.PUBLIC_SUPABASE_URL || ''
+const getSupabaseKey = () => env.PUBLIC_SUPABASE_ANON_KEY || ''
+
+// Create Supabase client only if environment variables are available and we're in browser
+let supabaseClient = null
+
+if (browser) {
+	const url = getSupabaseUrl()
+	const key = getSupabaseKey()
+	
+	if (url && key) {
+		supabaseClient = createClient(url, key)
+	}
+}
+
+export const supabase = supabaseClient
