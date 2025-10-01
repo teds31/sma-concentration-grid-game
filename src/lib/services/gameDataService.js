@@ -5,6 +5,11 @@ export class GameDataService {
 	// Save a game result for a user
 	static async saveGameResult(gameResult) {
 		try {
+			if (!supabase) {
+				console.log('Supabase not configured, skipping game result save');
+				return { data: null, error: null };
+			}
+
 			const { data: { user } } = await supabase.auth.getUser();
 			if (!user) throw new Error('User not authenticated');
 
@@ -35,6 +40,10 @@ export class GameDataService {
 	// Get user's game results
 	static async getUserGameResults(userId, limit = 50) {
 		try {
+			if (!supabase) {
+				return { data: [], error: null };
+			}
+
 			const { data, error } = await supabase
 				.from('game_results')
 				.select('*')
@@ -53,6 +62,10 @@ export class GameDataService {
 	// Get user's best times by difficulty
 	static async getUserBestTimes(userId) {
 		try {
+			if (!supabase) {
+				return { data: {}, error: null };
+			}
+
 			const { data, error } = await supabase
 				.from('game_results')
 				.select('difficulty, time_taken')
@@ -80,6 +93,19 @@ export class GameDataService {
 	// Get user's statistics
 	static async getUserStats(userId) {
 		try {
+			if (!supabase) {
+				return { 
+					data: {
+						gamesPlayed: { easy: 0, medium: 0, hard: 0 },
+						gamesCompleted: { easy: 0, medium: 0, hard: 0 },
+						averageScore: { easy: 0, medium: 0, hard: 0 },
+						totalGames: 0,
+						totalCompleted: 0
+					}, 
+					error: null 
+				};
+			}
+
 			const { data, error } = await supabase
 				.from('game_results')
 				.select('difficulty, completed, score')
@@ -124,6 +150,10 @@ export class GameDataService {
 	// Get global leaderboard for authenticated users
 	static async getGlobalLeaderboard(difficulty = null, limit = 100) {
 		try {
+			if (!supabase) {
+				return { data: [], error: null };
+			}
+
 			let query = supabase
 				.from('game_results')
 				.select(`
@@ -151,6 +181,10 @@ export class GameDataService {
 	// Initialize user profile
 	static async initializeUserProfile(user) {
 		try {
+			if (!supabase) {
+				return { data: null, error: null };
+			}
+
 			const { data, error } = await supabase
 				.from('profiles')
 				.upsert({

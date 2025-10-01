@@ -14,6 +14,16 @@ const createAuthStore = () => {
 		// Initialize auth state
 		async initialize() {
 			try {
+				// If Supabase is not configured, skip auth initialization
+				if (!supabase) {
+					set({
+						user: null,
+						loading: false,
+						initialized: true
+					});
+					return;
+				}
+
 				const { data: { session }, error } = await supabase.auth.getSession();
 				if (error) throw error;
 				
@@ -43,6 +53,9 @@ const createAuthStore = () => {
 
 		// Sign in with email/password
 		async signInWithEmail(email, password) {
+			if (!supabase) {
+				return { data: null, error: { message: 'Authentication not configured' } };
+			}
 			const { data, error } = await supabase.auth.signInWithPassword({
 				email,
 				password
@@ -52,6 +65,9 @@ const createAuthStore = () => {
 
 		// Sign up with email/password
 		async signUpWithEmail(email, password, userData = {}) {
+			if (!supabase) {
+				return { data: null, error: { message: 'Authentication not configured' } };
+			}
 			const { data, error } = await supabase.auth.signUp({
 				email,
 				password,
@@ -64,6 +80,9 @@ const createAuthStore = () => {
 
 		// Sign in with Google
 		async signInWithGoogle() {
+			if (!supabase) {
+				return { data: null, error: { message: 'Authentication not configured' } };
+			}
 			const { data, error } = await supabase.auth.signInWithOAuth({
 				provider: 'google',
 				options: {
@@ -75,6 +94,9 @@ const createAuthStore = () => {
 
 		// Sign in with Apple
 		async signInWithApple() {
+			if (!supabase) {
+				return { data: null, error: { message: 'Authentication not configured' } };
+			}
 			const { data, error } = await supabase.auth.signInWithOAuth({
 				provider: 'apple',
 				options: {
@@ -86,6 +108,9 @@ const createAuthStore = () => {
 
 		// Sign in with Facebook
 		async signInWithFacebook() {
+			if (!supabase) {
+				return { data: null, error: { message: 'Authentication not configured' } };
+			}
 			const { data, error } = await supabase.auth.signInWithOAuth({
 				provider: 'facebook',
 				options: {
@@ -97,12 +122,18 @@ const createAuthStore = () => {
 
 		// Sign out
 		async signOut() {
+			if (!supabase) {
+				return { error: { message: 'Authentication not configured' } };
+			}
 			const { error } = await supabase.auth.signOut();
 			return { error };
 		},
 
 		// Get current user
 		getCurrentUser() {
+			if (!supabase) {
+				return Promise.resolve({ data: { user: null }, error: null });
+			}
 			return supabase.auth.getUser();
 		}
 	};
